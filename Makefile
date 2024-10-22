@@ -4,7 +4,7 @@ SOURCE=triton_example.c
 OBJ=$(SOURCE:.c=.o)
 EXE=triton_example
 
-all: $(EXE) clean execute
+all: $(EXE) clean execute execute_format
 
 $(EXE): $(OBJ)
 	$(CC) $(OBJ) -o $@
@@ -17,3 +17,6 @@ clean:
 
 execute:
 	./$(EXE)
+
+execute_format:
+	./$(EXE) | jq
