@@ -44,33 +44,33 @@ struct triton_value_t {
 };
 
 typedef enum {
-    TOKEN_LBRACE,  // {
-    TOKEN_RBRACE,  // }
-    TOKEN_LBRACKET,// [
-    TOKEN_RBRACKET,// ]
-    TOKEN_COLON,   // :
-    TOKEN_COMMA,   // ,
-    TOKEN_STRING,  // "some string"
-    TOKEN_NUMBER,  // 123.45
-    TOKEN_TRUE,    // true
-    TOKEN_FALSE,   // false
-    TOKEN_NULL,    // null
-    TOKEN_EOF,     // End of file
-    TOKEN_ERROR    // Parsing error
-} TokenType;
+    TRITON_TOKEN_LBRACE,  // {
+    TRITON_TOKEN_RBRACE,  // }
+    TRITON_TOKEN_LBRACKET,// [
+    TRITON_TOKEN_RBRACKET,// ]
+    TRITON_TOKEN_COLON,   // :
+    TRITON_TOKEN_COMMA,   // ,
+    TRITON_TOKEN_STRING,  // "some string"
+    TRITON_TOKEN_NUMBER,  // 123.45
+    TRITON_TOKEN_TRUE,    // true
+    TRITON_TOKEN_FALSE,   // false
+    TRITON_TOKEN_NULL,    // null
+    TRITON_TOKEN_EOF,     // End of file
+    TRITON_TOKEN_ERROR    // Parsing error
+} triton_token_type_t;
 
 typedef struct {
-    TokenType type;
+    triton_token_type_t type;
     char *lexeme;
-} Token;
+} triton_token_t;
 
-void skip_whitespace(const char **input) {
+void triton_skip_whitespace(const char **input) {
     while (isspace(**input)) {
         (*input)++;
     }
 }
 
-char *extract_string(const char **input) {
+char *triton_extract_string(const char **input) {
     const char *start = ++(*input);  // Skip the initial "
     while (**input != '"' && **input != '\0') {
         (*input)++;
@@ -88,46 +88,46 @@ char *extract_string(const char **input) {
     return string;
 }
 
-Token next_token(const char **input) {
-    skip_whitespace(input);
+triton_token_t triton_next_token(const char **input) {
+    triton_skip_whitespace(input);
 
-    Token token;
+    triton_token_t token;
     token.lexeme = NULL;
 
     switch (**input) {
         case '{':
-            token.type = TOKEN_LBRACE;
+            token.type = TRITON_TOKEN_LBRACE;
             (*input)++;
             break;
         case '}':
-            token.type = TOKEN_RBRACE;
+            token.type = TRITON_TOKEN_RBRACE;
             (*input)++;
             break;
         case '[':
-            token.type = TOKEN_LBRACKET;
+            token.type = TRITON_TOKEN_LBRACKET;
             (*input)++;
             break;
         case ']':
-            token.type = TOKEN_RBRACKET;
+            token.type = TRITON_TOKEN_RBRACKET;
             (*input)++;
             break;
         case ':':
-            token.type = TOKEN_COLON;
+            token.type = TRITON_TOKEN_COLON;
             (*input)++;
             break;
         case ',':
-            token.type = TOKEN_COMMA;
+            token.type = TRITON_TOKEN_COMMA;
             (*input)++;
             break;
         case '"':
-            token.type = TOKEN_STRING;
-            token.lexeme = extract_string(input);
+            token.type = TRITON_TOKEN_STRING;
+            token.lexeme = triton_extract_string(input);
             if (token.lexeme == NULL) {
-                token.type = TOKEN_ERROR;
+                token.type = TRITON_TOKEN_ERROR;
             }
             break;
         case '\0':
-            token.type = TOKEN_EOF;
+            token.type = TRITON_TOKEN_EOF;
             break;
         default:
             // Handle numbers, true, false, null
@@ -144,18 +144,18 @@ Token next_token(const char **input) {
                 token.lexeme = malloc(length + 1);
                 strncpy(token.lexeme, start, length);
                 token.lexeme[length] = '\0';
-                token.type = TOKEN_NUMBER;
+                token.type = TRITON_TOKEN_NUMBER;
             } else if (strncmp(*input, "true", 4) == 0) {
-                token.type = TOKEN_TRUE;
+                token.type = TRITON_TOKEN_TRUE;
                 (*input) += 4;
             } else if (strncmp(*input, "false", 5) == 0) {
-                token.type = TOKEN_FALSE;
+                token.type = TRITON_TOKEN_FALSE;
                 (*input) += 5;
             } else if (strncmp(*input, "null", 4) == 0) {
-                token.type = TOKEN_NULL;
+                token.type = TRITON_TOKEN_NULL;
                 (*input) += 4;
             } else {
-                token.type = TOKEN_ERROR;
+                token.type = TRITON_TOKEN_ERROR;
             }
             break;
     }
