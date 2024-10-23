@@ -80,9 +80,11 @@ char *triton_extract_string(const char **input) {
     }
 
     size_t length = *input - start;
-    char *string = malloc(length + 1);
-    strncpy(string, start, length);
-    string[length] = '\0';
+    char *string = malloc(length + 1 + 2);
+    string[0] = '"';
+    strncpy(string + 1, start, length);
+    string[length+1] = '"'; // Todo probably we do not need to do that
+    string[length+2] = '\0'; // Todo probably we do not need to do that
 
     (*input)++;  // Skip the closing "
     return string;

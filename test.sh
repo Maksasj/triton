@@ -2,7 +2,7 @@
 
 echo 'Running snapshot tests'
 
-cd tests/snapshot
+cd tests/snapshot/rfc8259
 
 make
 
@@ -20,7 +20,7 @@ done;
 
 echo 'Running unit tests'
 
-cd ..
+cd ../..
 cd unit
 
 make
