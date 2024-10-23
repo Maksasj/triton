@@ -1,1 +1,3 @@
 triton_example
+parser
+*.json.result.txt
