@@ -3,10 +3,7 @@
 #define TRITON_IMPLEMENTATION
 #include "../../triton.h"
 
-#define RUN_TEST(TEST) printf("Running test '%s': ", #TEST); if((TEST())) printf("Succeed\n"); else printf("Failed\n");
-#define ENSURE_EQ(A, B) ((A) == (B))
-#define FAIL 0
-#define OK 1
+#include "test.h"
 
 int lex_token_lbrace() {
     const char *json = "{";
@@ -93,6 +90,7 @@ int lex_token_eof() {
 }
 
 int main() {
+    // Simple tokens
     RUN_TEST(lex_token_lbrace);
     RUN_TEST(lex_token_rbrace);
     RUN_TEST(lex_token_lbracket);
@@ -105,6 +103,8 @@ int main() {
     RUN_TEST(lex_token_false);
     RUN_TEST(lex_token_null);
     RUN_TEST(lex_token_eof);
+
+    // Literals
 
     return 0;
 }

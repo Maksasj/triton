@@ -1,5 +1,7 @@
 #!/bin/sh
 
+echo 'Running snapshot tests'
+
 cd tests/snapshot
 
 make
@@ -16,3 +18,9 @@ for d in */; do
     cd ..
 done;
 
+echo 'Running unit tests'
+
+cd ..
+cd unit
+
+make
