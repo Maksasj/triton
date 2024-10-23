@@ -1,163 +1,179 @@
 #ifndef TRITON_H
 #define TRITON_H
 
-#include <stdio.h>
+// json values: number, string, null, array, object
 
-#ifndef TRITON_FPRINTF 
-    #define TRITON_FPRINTF fprintf
-#endif
+#include <string.h>
+#include <ctype.h>
+
+#define HAUL_IMPLEMETATION
+#include "vector.h"
+
+// json object
+typedef struct {
+} triton_object_t;
+
+// json array
+typedef struct {
+} triton_array_t;
 
 typedef struct {
-    int tail;
-    int key;
-} triton_scope_t;
 
-#define TRITON_MAX_SCOPES 100
+} triton_value_entry_t;
+
+typedef struct triton_value_t triton_value_t;
 
 typedef struct {
-    FILE* sink;
-    triton_scope_t scopes[TRITON_MAX_SCOPES];
-    int scope;
-} triton_serializer_t;
 
-typedef triton_serializer_t triser_t;
+} triton_primitive_t;
 
-void tri_begin_element(triser_t* tri);
-void tri_end_element(triser_t* tri);
+struct triton_value_t {
+    union {
+        triton_primitive_t primitive;
 
-void tri_begin_object(triser_t* tri);
-void tri_object_end(triser_t* tri);
+        struct {
+            triton_value_t* entries;
+            int count;
+        } array;
 
-void tri_begin_array(triser_t* tri);
-void tri_end_array(triser_t* tri);
+        struct {
+            triton_value_entry_t* entries;
+            int count;
+        } object;
+    } as;
+};
 
-void tri_member_key(triser_t* tri, const char* key);
+typedef enum {
+    TOKEN_LBRACE,  // {
+    TOKEN_RBRACE,  // }
+    TOKEN_LBRACKET,// [
+    TOKEN_RBRACKET,// ]
+    TOKEN_COLON,   // :
+    TOKEN_COMMA,   // ,
+    TOKEN_STRING,  // "some string"
+    TOKEN_NUMBER,  // 123.45
+    TOKEN_TRUE,    // true
+    TOKEN_FALSE,   // false
+    TOKEN_NULL,    // null
+    TOKEN_EOF,     // End of file
+    TOKEN_ERROR    // Parsing error
+} TokenType;
 
-void tri_null(triser_t* tri);
-void tri_bool(triser_t* tri, int value);
-void tri_float(triser_t* tri, float value);
-void tri_integer(triser_t* tri, int value);
-void tri_string(triser_t* tri, const char* value);
+typedef struct {
+    TokenType type;
+    char *lexeme;
+} Token;
 
-#ifdef TRITON_IMPLEMENTATION
-
-triton_scope_t* tri_current_scope(triser_t* tri) {
-    return &tri->scopes[tri->scope];
-}
-
-void tri_push_scope(triser_t* tri) {
-    tri->scopes[tri->scope].tail = 0;
-    tri->scopes[tri->scope].key = 1;
-    ++tri->scope;
-}
-
-void tri_pop_scope(triser_t* tri) {
-    --tri->scope;
-}
-
-void tri_begin_element(triser_t* tri) {
-    triton_scope_t* scope = tri_current_scope(tri);
-
-    if(scope->tail && !scope->key) {
-        TRITON_FPRINTF(tri->sink, ",");
+void skip_whitespace(const char **input) {
+    while (isspace(**input)) {
+        (*input)++;
     }
 }
 
-void tri_end_element(triser_t* tri) {
-    triton_scope_t* scope = tri_current_scope(tri);
+char *extract_string(const char **input) {
+    const char *start = ++(*input);  // Skip the initial "
+    while (**input != '"' && **input != '\0') {
+        (*input)++;
+    }
+    if (**input == '\0') {
+        return NULL; // Unterminated string
+    }
 
-    scope->tail = 1;
-    scope->key = 0;
+    size_t length = *input - start;
+    char *string = malloc(length + 1);
+    strncpy(string, start, length);
+    string[length] = '\0';
+
+    (*input)++;  // Skip the closing "
+    return string;
 }
 
-void tri_begin_object(triser_t* tri) {
-    tri_begin_element(tri);
+Token next_token(const char **input) {
+    skip_whitespace(input);
 
-    tri_push_scope(tri);
-    TRITON_FPRINTF(tri->sink, "{");
-    triton_scope_t* scope = tri_current_scope(tri);
-    scope->key = 1;
+    Token token;
+    token.lexeme = NULL;
+
+    switch (**input) {
+        case '{':
+            token.type = TOKEN_LBRACE;
+            (*input)++;
+            break;
+        case '}':
+            token.type = TOKEN_RBRACE;
+            (*input)++;
+            break;
+        case '[':
+            token.type = TOKEN_LBRACKET;
+            (*input)++;
+            break;
+        case ']':
+            token.type = TOKEN_RBRACKET;
+            (*input)++;
+            break;
+        case ':':
+            token.type = TOKEN_COLON;
+            (*input)++;
+            break;
+        case ',':
+            token.type = TOKEN_COMMA;
+            (*input)++;
+            break;
+        case '"':
+            token.type = TOKEN_STRING;
+            token.lexeme = extract_string(input);
+            if (token.lexeme == NULL) {
+                token.type = TOKEN_ERROR;
+            }
+            break;
+        case '\0':
+            token.type = TOKEN_EOF;
+            break;
+        default:
+            // Handle numbers, true, false, null
+            if (isdigit(**input) || **input == '-') {
+                // Parse a number
+                const char *start = *input;
+                if (**input == '-') (*input)++;
+                while (isdigit(**input)) (*input)++;
+                if (**input == '.') {
+                    (*input)++;
+                    while (isdigit(**input)) (*input)++;
+                }
+                size_t length = *input - start;
+                token.lexeme = malloc(length + 1);
+                strncpy(token.lexeme, start, length);
+                token.lexeme[length] = '\0';
+                token.type = TOKEN_NUMBER;
+            } else if (strncmp(*input, "true", 4) == 0) {
+                token.type = TOKEN_TRUE;
+                (*input) += 4;
+            } else if (strncmp(*input, "false", 5) == 0) {
+                token.type = TOKEN_FALSE;
+                (*input) += 5;
+            } else if (strncmp(*input, "null", 4) == 0) {
+                token.type = TOKEN_NULL;
+                (*input) += 4;
+            } else {
+                token.type = TOKEN_ERROR;
+            }
+            break;
+    }
+
+    return token;
 }
 
-void tri_object_end(triser_t* tri) {
-    TRITON_FPRINTF(tri->sink, "}");
-    
-    tri_pop_scope(tri);
-    tri_end_element(tri);
-}
+typedef struct {
 
-void tri_begin_array(triser_t* tri) {
-    tri_begin_element(tri);
-    
-    tri_push_scope(tri);
-    triton_scope_t* scope = tri_current_scope(tri);
-    scope->key = 1;
+} triton_json_t;
 
-    TRITON_FPRINTF(tri->sink, "[");
-}
+typedef enum {
+    TRITON_OK,
+    TRITON_ERROR,
+} triton_result_code_t;
 
-void tri_end_array(triser_t* tri) {
-    TRITON_FPRINTF(tri->sink, "]");
-
-    tri_pop_scope(tri);
-    tri_end_element(tri);
-}
-
-void tri_member_key(triser_t* tri, const char* key) {
-    triton_scope_t* scope = tri_current_scope(tri);
-
-    tri_begin_element(tri);
-    
-    TRITON_FPRINTF(tri->sink, "\"%s\":", key);
-
-    tri_end_element(tri);
-
-    scope->key = 1;
-}
-
-void tri_null(triser_t* tri) {
-    tri_begin_element(tri);
-    
-    TRITON_FPRINTF(tri->sink, "null");
-
-    tri_end_element(tri);
-}
-
-void tri_bool(triser_t* tri, int value) {
-    tri_begin_element(tri);
-
-    if(value) {
-        TRITON_FPRINTF(tri->sink, "true");
-    } else 
-        TRITON_FPRINTF(tri->sink, "false");
-
-    tri_end_element(tri);
-}
-
-void tri_float(triser_t* tri, float value) {
-    tri_begin_element(tri);
-
-    TRITON_FPRINTF(tri->sink, "%f", value);
-
-    tri_end_element(tri);
-}
-
-void tri_integer(triser_t* tri, int value) {
-    tri_begin_element(tri);
-
-    TRITON_FPRINTF(tri->sink, "%d", value);
-
-    tri_end_element(tri);
-}
-
-void tri_string(triser_t* tri, const char* value) {
-    tri_begin_element(tri);
-
-    TRITON_FPRINTF(tri->sink, "\"%s\"", value);
-
-    tri_end_element(tri);
-}
-
-#endif
+typedef struct {
+    triton_result_code_t code;
+} triton_result_t;
 
 #endif

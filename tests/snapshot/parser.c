@@ -1,5 +1,7 @@
+#include <stdio.h>
+
 #define TRITON_IMPLEMENTATION
-#include "../triton.h"
+#include "../../triton.h"
 
 int main(int argc, char *argv[]) {
     FILE *stream = stdin;
@@ -9,11 +11,9 @@ int main(int argc, char *argv[]) {
     else 
         fprintf(stderr, "ERROR");
 
-
     triton_json_t json;
-    triton_result_t result = triton_parse(&json, stream);
 
-    if(result.status = TRITON_ERROR) {
+    if(triton_parse(&json, stream).code = TRITON_ERROR) {
         printf("Failed to parse");
     } else {
         printf("Parse succeeded");

@@ -1,6 +1,6 @@
 #!/bin/sh
 
-cd tests
+cd tests/snapshot
 
 make
 

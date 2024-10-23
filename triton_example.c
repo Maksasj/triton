@@ -4,9 +4,23 @@
 #include "triton.h"
 
 int main() {
+    const char *json = "{\"key\": \"value\", \"number\": 123, \"flag\": true}";
+
+    const char *input = json;
+    Token token;
+    do {
+        token = next_token(&input);
+        printf("Token type: %d, Lexeme: %s\n", token.type, token.lexeme ? token.lexeme : "N/A");
+
+        if (token.lexeme) {
+            free(token.lexeme);
+        }
+    } while (token.type != TOKEN_EOF && token.type != TOKEN_ERROR);
+    /*
     triser_t tri = {
         .sink = stdout
     };
+    */
 
     /*
     tri_begin_object(&tri);
@@ -34,7 +48,6 @@ int main() {
         } 
         tri_end_array(&tri);
     tri_object_end(&tri);
-    */
    
     tri_begin_object(&tri);
         tri_member_key(&tri, "name");
@@ -140,6 +153,7 @@ int main() {
             tri_object_end(&tri);
         tri_end_array(&tri);
     tri_object_end(&tri);
+    */
 
     return 0;
 }
