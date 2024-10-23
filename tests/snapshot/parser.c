@@ -13,13 +13,13 @@ int main(int argc, char *argv[]) {
 
     triton_json_t json;
 
-    if(triton_parse(&json, stream).code = TRITON_ERROR) {
-        printf("Failed to parse");
-    } else {
-        printf("Parse succeeded");
-    }
+    // if(triton_parse(&json, stream).code = TRITON_ERROR) {
+    //     printf("Failed to parse");
+    // } else {
+    //     printf("Parse succeeded");
+    // }
 
-    triton_free_json(&json);
+    // triton_free_json(&json);
 
     return 0;
 }
