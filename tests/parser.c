@@ -9,9 +9,17 @@ int main(int argc, char *argv[]) {
     else 
         fprintf(stderr, "ERROR");
 
-    printf("Parsing %s!\n", argv[1]);
 
-    // Todo parse
+    triton_json_t json;
+    triton_result_t result = triton_parse(&json, stream);
+
+    if(result.status = TRITON_ERROR) {
+        printf("Failed to parse");
+    } else {
+        printf("Parse succeeded");
+    }
+
+    triton_free_json(&json);
 
     return 0;
 }
