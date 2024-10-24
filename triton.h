@@ -42,15 +42,45 @@ triton_token_t triton_next_token(triton_lexer_t* lexer);
 
 // Json parsing
 typedef struct triton_value_t triton_value_t;
+typedef struct triton_value_entry_t triton_value_entry_t;
 
 typedef struct {
-    const char* name;
-    triton_value_t* value;
-} triton_value_entry_t;
+    void** items;
 
-typedef struct {
+    int capacity;
+    int count;
+} triton_container_base_t;
 
-} triton_primitive_t;
+typedef triton_container_base_t triton_array_t;
+typedef triton_container_base_t triton_object_t;
+
+void create_container_base(triton_container_base_t* container_base, int initial_capacity);
+void container_base_push(triton_container_base_t* container_base, void* item);
+void* container_base_pop(triton_container_base_t* container_base);
+void* container_base_get(triton_container_base_t* container_base, int index);
+int container_base_empty(triton_container_base_t* container_base);
+int container_base_size(triton_container_base_t* container_base);
+int container_base_capacity(triton_container_base_t* container_base);
+void free_container_base(triton_container_base_t* container_base);
+void free_container_base_content(triton_container_base_t* container_base);
+
+void create_triton_array(triton_array_t* triton_array, int initial_capacity);
+void triton_array_push(triton_array_t* triton_array, void* item);
+triton_value_t* triton_array_pop(triton_array_t* triton_array);
+triton_value_t* triton_array_get(triton_array_t* triton_array, int index);
+int triton_array_empty(triton_array_t* triton_array);
+int triton_array_size(triton_array_t* triton_array);
+void free_triton_array(triton_array_t* triton_array);
+void free_triton_array_content(triton_array_t* triton_array);
+
+void create_triton_object(triton_object_t* triton_object, int initial_capacity);
+void triton_object_push(triton_object_t* triton_object, void* item);
+triton_value_entry_t* triton_object_pop(triton_object_t* triton_object);
+triton_value_entry_t* triton_object_get(triton_object_t* triton_object, int index);
+int triton_object_empty(triton_object_t* triton_object);
+int triton_object_size(triton_object_t* triton_object);
+void free_triton_object(triton_object_t* triton_object);
+void free_triton_object_content(triton_object_t* triton_object);
 
 typedef enum {
     TRITON_PRIMITIVE_VALUE,
@@ -58,22 +88,23 @@ typedef enum {
     TRITON_OBJECT_VALUE,
 } triton_value_type_t;
 
+typedef struct {
+    const char* lexeme;
+} triton_primitive_t;
+
 struct triton_value_t {
     triton_value_type_t type;
 
     union {
         triton_primitive_t primitive;
-
-        struct {
-            triton_value_t* entries;
-            int count;
-        } array;
-
-        struct {
-            triton_value_entry_t* entries;
-            int count;
-        } object;
+        triton_array_t array;
+        triton_object_t object;
     } as;
+};
+
+struct triton_value_entry_t {
+    const char* name;
+    triton_value_t value;
 };
 
 typedef struct {
@@ -100,7 +131,140 @@ triton_parse_result_t triton_parse_value(triton_value_t* value, triton_lexer_t* 
 
 triton_parse_result_t triton_parse_json(triton_json_t* json, const char* string);
 
+// Stringify
+void triton_stringify_value(FILE* stream, triton_value_t* value);
+void triton_stringify_json(FILE* stream, triton_json_t* json);
+
 #ifdef TRITON_IMPLEMENTATION
+
+void create_container_base(triton_container_base_t* container_base, int initial_capacity) {
+    assert(initial_capacity > 0);
+
+    container_base->items = calloc(initial_capacity, sizeof(void*));
+
+    container_base->count = 0;
+    container_base->capacity = initial_capacity;
+}
+
+void container_base_push(triton_container_base_t* container_base, void* item) {
+    if(container_base->count + 1 > container_base->capacity) {
+        container_base->capacity = container_base->capacity * 2;
+
+        // Todo check if items is null
+        container_base->items = realloc(container_base->items, container_base->capacity * sizeof(void*));
+    }
+
+    container_base->items[container_base->count] = item;
+    ++container_base->count;
+}
+
+void* container_base_pop(triton_container_base_t* container_base) {
+    if(container_base->count == 0) {
+        return NULL;
+    }
+
+    --container_base->count;
+    void* popped_value = container_base->items[container_base->count];
+
+    if(container_base->count > 10 && (container_base->count <= container_base->capacity / 2)) {
+        container_base->capacity = container_base->capacity / 2;
+
+        // Todo check if items is null
+        container_base->items = realloc(container_base->items, container_base->capacity * sizeof(void*));
+    }
+
+    return popped_value;
+}
+
+void* container_base_get(triton_container_base_t* container_base, int index) {
+    if(container_base->count <= index) {
+        return NULL;
+    }
+
+    return container_base->items[index];
+}
+
+int container_base_empty(triton_container_base_t* container_base) {
+    return container_base->count == 0;
+}
+
+int container_base_size(triton_container_base_t* container_base) {
+    return container_base->count;
+}
+
+void free_container_base(triton_container_base_t* container_base) {
+    free(container_base->items);
+}
+
+void free_container_base_content(triton_container_base_t* container_base) {
+    for(int i = 0; i < container_base->count; ++i) {
+        free(container_base->items[i]);
+    }
+}
+
+void create_triton_array(triton_array_t* triton_array, int initial_capacity) {
+    create_container_base(triton_array, initial_capacity);
+}
+
+void triton_array_push(triton_array_t* triton_array, void* item) {
+    container_base_push(triton_array, item);
+}
+
+triton_value_t* triton_array_pop(triton_array_t* triton_array) {
+    return container_base_pop(triton_array);
+}
+
+triton_value_t* triton_array_get(triton_array_t* triton_array, int index) {
+    return container_base_get(triton_array, index);
+}
+
+int triton_array_empty(triton_array_t* triton_array) {
+    return container_base_empty(triton_array);
+}
+
+int triton_array_size(triton_array_t* triton_array) {
+    return container_base_size(triton_array);
+}
+
+void free_triton_array(triton_array_t* triton_array) {
+    free_container_base(triton_array);
+}
+
+void free_triton_array_content(triton_array_t* triton_array) {
+    free_container_base_content(triton_array);
+}
+
+void create_triton_object(triton_object_t* triton_object, int initial_capacity) {
+    create_container_base(triton_object, initial_capacity);
+}
+
+void triton_object_push(triton_object_t* triton_object, void* item) {
+    container_base_push(triton_object, item);
+}
+
+triton_value_entry_t* triton_object_pop(triton_object_t* triton_object) {
+    return container_base_pop(triton_object);
+}
+
+triton_value_entry_t* triton_object_get(triton_object_t* triton_object, int index) {
+    return container_base_get(triton_object, index);
+}
+
+int triton_object_empty(triton_object_t* triton_object) {
+    return container_base_empty(triton_object);
+}
+
+int triton_object_size(triton_object_t* triton_object) {
+    return container_base_size(triton_object);
+}
+
+void free_triton_object(triton_object_t* triton_object) {
+    free_container_base(triton_object);
+}
+
+void free_triton_object_content(triton_object_t* triton_object) {
+    free_container_base_content(triton_object);
+}
 
 // Lexer
 void triton_skip_whitespace(triton_lexer_t* lexer) {
@@ -175,25 +339,41 @@ triton_token_t triton_next_token(triton_lexer_t* lexer) {
             if (isdigit(lexer->input[lexer->pointer]) || lexer->input[lexer->pointer] == '-') {
                 // Parse a number
                 int start = lexer->pointer;
-                if (lexer->input[lexer->pointer] == '-') lexer->pointer++;
-                while (isdigit(lexer->input[lexer->pointer])) lexer->pointer++;
+                
+                if (lexer->input[lexer->pointer] == '-') 
+                    lexer->pointer++;
+                
+                while (isdigit(lexer->input[lexer->pointer])) 
+                    lexer->pointer++;
+                
                 if (lexer->input[lexer->pointer] == '.') {
                     lexer->pointer++;
-                    while (isdigit(lexer->input[lexer->pointer])) lexer->pointer++;
+
+                    while (isdigit(lexer->input[lexer->pointer])) 
+                        lexer->pointer++;
                 }
+                
                 int length = lexer->pointer - start;
+
                 token.lexeme = malloc(length + 1);
-                strncpy(token.lexeme, lexer->input + lexer->pointer, length);
+                strncpy(token.lexeme, &lexer->input[start], length);
+
                 token.lexeme[length] = '\0';
                 token.type = TRITON_TOKEN_NUMBER;
             } else if (strncmp(lexer->input + lexer->pointer, "true", 4) == 0) {
                 token.type = TRITON_TOKEN_TRUE;
+                token.lexeme = "true";
+                
                 lexer->pointer += 4;
             } else if (strncmp(lexer->input + lexer->pointer, "false", 5) == 0) {
                 token.type = TRITON_TOKEN_FALSE;
+                token.lexeme = "false";
+                
                 lexer->pointer += 5;
             } else if (strncmp(lexer->input + lexer->pointer, "null", 4) == 0) {
                 token.type = TRITON_TOKEN_NULL;
+                token.lexeme = "null";
+
                 lexer->pointer += 4;
             } else {
                 token.type = TRITON_TOKEN_ERROR;
@@ -206,6 +386,20 @@ triton_token_t triton_next_token(triton_lexer_t* lexer) {
 }
 
 // Parser
+triton_parse_result_t triton_parse_token(triton_lexer_t* lexer, triton_token_type_t type) {
+    triton_lexer_t backup = *lexer;
+
+    triton_token_t token = triton_next_token(lexer);
+
+    if(token.type == type) {
+        return (triton_parse_result_t) { TRITON_OK };
+    }
+    
+    *lexer = backup;
+
+    return (triton_parse_result_t) { TRITON_ERROR };
+}
+
 triton_parse_result_t triton_parse_string(triton_value_t* value, triton_lexer_t* lexer) {
     triton_lexer_t backup = *lexer;
 
@@ -213,6 +407,7 @@ triton_parse_result_t triton_parse_string(triton_value_t* value, triton_lexer_t*
 
     if(token.type == TRITON_TOKEN_STRING) {
         value->type = TRITON_PRIMITIVE_VALUE;
+        value->as.primitive.lexeme = token.lexeme;
         return (triton_parse_result_t) { TRITON_OK };
     }
     
@@ -228,6 +423,7 @@ triton_parse_result_t triton_parse_number(triton_value_t* value, triton_lexer_t*
 
     if(token.type == TRITON_TOKEN_NUMBER) {
         value->type = TRITON_PRIMITIVE_VALUE;
+        value->as.primitive.lexeme = token.lexeme;
         return (triton_parse_result_t) { TRITON_OK };
     }
     
@@ -237,95 +433,79 @@ triton_parse_result_t triton_parse_number(triton_value_t* value, triton_lexer_t*
 }
 
 triton_parse_result_t triton_parse_object(triton_value_t* value, triton_lexer_t* lexer) {
-    triton_lexer_t backup = *lexer;
-
-    triton_token_t token = triton_next_token(lexer);
-    
-    if(token.type != TRITON_TOKEN_LBRACE) {
-        *lexer = backup;
+    if(triton_parse_token(lexer, TRITON_TOKEN_LBRACE).code == TRITON_ERROR)
         return (triton_parse_result_t) { TRITON_ERROR };
-    }
+
+    triton_object_t object;
+    create_triton_array(&object, 10);
 
     int i = 0;
     for(;;++i) {
-        // if(i != 0) {
-        //     backup = *lexer;
-        //     token = triton_next_token(lexer);
-// 
-        //     if(token.type != TRITON_TOKEN_COMMA) {
-        //         *lexer = backup;
-        //         break;
-        //     }
-        // }
-// 
-        // backup = *lexer;
-        // triton_parse_result_t result = triton_parse_value(value, lexer);
-// 
-        // if(result.code == TRITON_ERROR) {
-        //     *lexer = backup;
-        //     break;
-        // }
+        if(i != 0 && triton_parse_token(lexer, TRITON_TOKEN_COMMA).code == TRITON_ERROR)
+            break;
+        
+        triton_value_t key_value;
+        triton_parse_result_t key_result = triton_parse_string(&key_value, lexer);
 
-        break;
+        if(key_result.code == TRITON_ERROR)
+            break;
+
+        if(triton_parse_token(lexer, TRITON_TOKEN_COLON).code == TRITON_ERROR)
+            break;
+
+        triton_value_t entry_value;
+        triton_parse_result_t value_result = triton_parse_value(&entry_value, lexer);
+
+        if(value_result.code == TRITON_ERROR)
+            break;
+
+        triton_value_entry_t* actual = (triton_value_entry_t*) malloc(sizeof(triton_value_entry_t));
+        actual->name = key_value.as.primitive.lexeme;
+        actual->value = entry_value;
+        triton_array_push(&object, actual);
     }
 
-    backup = *lexer;
-    token = triton_next_token(lexer);
-    if(token.type != TRITON_TOKEN_RBRACE) {
-        *lexer = backup;
+    if(triton_parse_token(lexer, TRITON_TOKEN_RBRACE).code == TRITON_ERROR) {
+        free_triton_array(&object); // Todo
         return (triton_parse_result_t) { TRITON_ERROR };
     }
 
     value->type = TRITON_OBJECT_VALUE;
-
-    value->as.object.count = i;
-    value->as.object.entries = NULL; // Todo
+    value->as.object = object;
 
     return (triton_parse_result_t) { TRITON_OK };
 }
 
 triton_parse_result_t triton_parse_array(triton_value_t* value, triton_lexer_t* lexer) {
-    triton_lexer_t backup = *lexer;
-
-    triton_token_t token = triton_next_token(lexer);
-    
-    if(token.type != TRITON_TOKEN_LBRACKET) {
-        *lexer = backup;
+    if(triton_parse_token(lexer, TRITON_TOKEN_LBRACKET).code == TRITON_ERROR)
         return (triton_parse_result_t) { TRITON_ERROR };
-    }
+
+    triton_array_t array;
+    create_triton_array(&array, 10);
 
     int i = 0;
     for(;;++i) {
-        if(i != 0) {
-            backup = *lexer;
-            token = triton_next_token(lexer);
-
-            if(token.type != TRITON_TOKEN_COMMA) {
-                *lexer = backup;
-                break;
-            }
-        }
-
-        backup = *lexer;
-        triton_parse_result_t result = triton_parse_value(value, lexer);
-
-        if(result.code == TRITON_ERROR) {
-            *lexer = backup;
+        if(i != 0 && triton_parse_token(lexer, TRITON_TOKEN_COMMA).code == TRITON_ERROR)
             break;
-        }
+
+        triton_value_t entry_value;
+        triton_parse_result_t result = triton_parse_value(&entry_value, lexer);
+
+        if(result.code == TRITON_ERROR)
+            break;
+
+        triton_value_t* actual = (triton_value_t*) malloc(sizeof(triton_value_t));
+        *actual = entry_value;
+        triton_array_push(&array, actual);
     }
 
-    backup = *lexer;
-    token = triton_next_token(lexer);
-    if(token.type != TRITON_TOKEN_RBRACKET) {
-        *lexer = backup;
+    if(triton_parse_token(lexer, TRITON_TOKEN_RBRACKET).code == TRITON_ERROR) {
+        free_triton_array(&array); // Todo
         return (triton_parse_result_t) { TRITON_ERROR };
     }
 
     value->type = TRITON_ARRAY_VALUE;
-
-    value->as.array.count = i;
-    value->as.array.entries = NULL; // Todo
+    value->as.array = array;
 
     return (triton_parse_result_t) { TRITON_OK };
 }
@@ -337,6 +517,7 @@ triton_parse_result_t triton_parse_true(triton_value_t* value, triton_lexer_t* l
 
     if(token.type == TRITON_TOKEN_TRUE) {
         value->type = TRITON_PRIMITIVE_VALUE;
+        value->as.primitive.lexeme = token.lexeme;
         return (triton_parse_result_t) { TRITON_OK };
     }
     
@@ -352,6 +533,7 @@ triton_parse_result_t triton_parse_false(triton_value_t* value, triton_lexer_t* 
 
     if(token.type == TRITON_TOKEN_FALSE) {
         value->type = TRITON_PRIMITIVE_VALUE;
+        value->as.primitive.lexeme = token.lexeme;
         return (triton_parse_result_t) { TRITON_OK };
     }
     
@@ -367,6 +549,7 @@ triton_parse_result_t triton_parse_null(triton_value_t* value, triton_lexer_t* l
 
     if(token.type == TRITON_TOKEN_NULL) {
         value->type = TRITON_PRIMITIVE_VALUE;
+        value->as.primitive.lexeme = token.lexeme;
         return (triton_parse_result_t) { TRITON_OK };
     }
     
@@ -423,6 +606,56 @@ triton_parse_result_t triton_parse_json(triton_json_t* json, const char* string)
     };
 
     return triton_parse_value(&json->value, &lexer);
+}
+
+// Stringify
+void triton_stringify_value(FILE* stream, triton_value_t* value) {
+    if(value->type == TRITON_PRIMITIVE_VALUE) {
+        fprintf(stream, "%s", value->as.primitive.lexeme);
+        return;
+    }
+
+    if(value->type == TRITON_ARRAY_VALUE) {
+        int count = value->as.array.count;
+
+        fprintf(stream, "[ ");
+
+        for(int i = 0; i < count; ++i) {
+            if( i != 0)
+                fprintf(stream, ", ");
+
+            triton_stringify_value(stream, triton_array_get(&value->as.array, i));
+        }
+
+        fprintf(stream, " ]");
+
+        return;
+    }
+
+    if(value->type == TRITON_OBJECT_VALUE) {
+        int count = value->as.object.count;
+
+        fprintf(stream, "{ ");
+
+        for(int i = 0; i < count; ++i) {
+            if( i != 0)
+                fprintf(stream, ", ");
+
+            triton_value_entry_t* value_entry = triton_object_get(&value->as.object, i);
+            
+            fprintf(stream, "%s: ", value_entry->name);
+
+            triton_stringify_value(stream, &value_entry->value);
+        }
+
+        fprintf(stream, " }");
+
+        return;
+    }
+}
+
+void triton_stringify_json(FILE* stream, triton_json_t* json) {
+    triton_stringify_value(stream, &json->value);
 }
 
 #endif

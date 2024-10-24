@@ -4,7 +4,7 @@
 #include "triton.h"
 
 int main() {
-    const char *string = "{\"key\": \"value\", \"number\": 123, \"flag\": true}";
+    const char *string = "[ true, false, \"poggers\" ]";
 
     triton_json_t json;
     if(triton_parse_json(&json, string).code == TRITON_OK) 
@@ -12,18 +12,7 @@ int main() {
     else
         printf("Failed to parse json\n");
 
-    /*
-    const char *input = json;
-    triton_token_t token;
-    do {
-        token = triton_next_token(&input);
-        printf("triton_token_t type: %d, Lexeme: %s\n", token.type, token.lexeme ? token.lexeme : "N/A");
-
-        if (token.lexeme) {
-            free(token.lexeme);
-        }
-    } while (token.type != TRITON_TOKEN_EOF && token.type != TRITON_TOKEN_ERROR);
-    */
+    triton_stringify_json(stdout, &json);
 
     return 0;
 }

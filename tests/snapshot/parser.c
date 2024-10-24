@@ -25,15 +25,15 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    fread (buffer, 1, length, stream);
+    fread(buffer, 1, length, stream);
 
     triton_json_t json;
     triton_parse_result_t result = triton_parse_json(&json, buffer);
 
-    if(result.code = TRITON_ERROR) {
+    if(result.code == TRITON_ERROR) {
         printf("Failed to parse");
     } else {
-        printf("Parse succeeded");
+        triton_stringify_json(stdout, &json);
     }
 
     fclose (stream);
