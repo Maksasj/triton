@@ -1,19 +1,20 @@
-
 CC=gcc
-SOURCE=lexer.test.c
-OBJ=$(SOURCE:.c=.o)
-EXE=lexer.test
+SOURCES=lexer.test.c parser.test.c
+EXES=$(SOURCES:.c=)
 
-all: $(EXE) clean test
+all: $(EXES) clean test
 
-$(EXE): $(OBJ)
-	$(CC) $(OBJ) -o $@
+lexer.test: lexer.test.o
+	$(CC) lexer.test.o -o lexer.test
 
-.o: .c
+parser.test: parser.test.o
+	$(CC) parser.test.o -o parser.test
+
+%.o: %.c
 	$(CC) -c $< -o $@
 
 clean:
-	rm -rf $(OBJ)
+	rm -rf *.o
 
-test:
-	./$(EXE)
+test: $(EXES)
+	@for exe in $(EXES); do ./$$exe; done

@@ -9,25 +9,58 @@
 #define HAUL_IMPLEMETATION
 #include "vector.h"
 
-// json object
+// Lexer
+typedef enum {
+    TRITON_TOKEN_LBRACE,  
+    TRITON_TOKEN_RBRACE,  
+    TRITON_TOKEN_LBRACKET,
+    TRITON_TOKEN_RBRACKET,
+    TRITON_TOKEN_COLON,   
+    TRITON_TOKEN_COMMA,   
+    TRITON_TOKEN_STRING,  
+    TRITON_TOKEN_NUMBER,  
+    TRITON_TOKEN_TRUE,    
+    TRITON_TOKEN_FALSE,   
+    TRITON_TOKEN_NULL,    
+    TRITON_TOKEN_EOF,     
+    TRITON_TOKEN_ERROR    
+} triton_token_type_t;
+
 typedef struct {
-} triton_object_t;
-
-// json array
-typedef struct {
-} triton_array_t;
+    triton_token_type_t type;
+    char *lexeme;
+} triton_token_t;
 
 typedef struct {
+    const char* input;
+    int pointer;
+} triton_lexer_t;
 
-} triton_value_entry_t;
+void triton_skip_whitespace(triton_lexer_t* lexer);
+char *triton_extract_string(triton_lexer_t* lexer);
+triton_token_t triton_next_token(triton_lexer_t* lexer);
 
+// Json parsing
 typedef struct triton_value_t triton_value_t;
+
+typedef struct {
+    const char* name;
+    triton_value_t* value;
+} triton_value_entry_t;
 
 typedef struct {
 
 } triton_primitive_t;
 
+typedef enum {
+    TRITON_PRIMITIVE_VALUE,
+    TRITON_ARRAY_VALUE,
+    TRITON_OBJECT_VALUE,
+} triton_value_type_t;
+
 struct triton_value_t {
+    triton_value_type_t type;
+
     union {
         triton_primitive_t primitive;
 
@@ -43,87 +76,93 @@ struct triton_value_t {
     } as;
 };
 
+typedef struct {
+    triton_value_t value;
+} triton_json_t;
+
 typedef enum {
-    TRITON_TOKEN_LBRACE,  // {
-    TRITON_TOKEN_RBRACE,  // }
-    TRITON_TOKEN_LBRACKET,// [
-    TRITON_TOKEN_RBRACKET,// ]
-    TRITON_TOKEN_COLON,   // :
-    TRITON_TOKEN_COMMA,   // ,
-    TRITON_TOKEN_STRING,  // "some string"
-    TRITON_TOKEN_NUMBER,  // 123.45
-    TRITON_TOKEN_TRUE,    // true
-    TRITON_TOKEN_FALSE,   // false
-    TRITON_TOKEN_NULL,    // null
-    TRITON_TOKEN_EOF,     // End of file
-    TRITON_TOKEN_ERROR    // Parsing error
-} triton_token_type_t;
+    TRITON_OK,
+    TRITON_ERROR
+} triton_result_code_t;
 
 typedef struct {
-    triton_token_type_t type;
-    char *lexeme;
-} triton_token_t;
+    triton_result_code_t code;
+} triton_parse_result_t;
 
-void triton_skip_whitespace(const char **input) {
-    while (isspace(**input)) {
-        (*input)++;
+triton_parse_result_t triton_parse_string(triton_value_t* value, triton_lexer_t* lexer);
+triton_parse_result_t triton_parse_number(triton_value_t* value, triton_lexer_t* lexer);
+triton_parse_result_t triton_parse_object(triton_value_t* value, triton_lexer_t* lexer);
+triton_parse_result_t triton_parse_array(triton_value_t* value, triton_lexer_t* lexer);
+triton_parse_result_t triton_parse_true(triton_value_t* value, triton_lexer_t* lexer);
+triton_parse_result_t triton_parse_false(triton_value_t* value, triton_lexer_t* lexer);
+triton_parse_result_t triton_parse_null(triton_value_t* value, triton_lexer_t* lexer);
+triton_parse_result_t triton_parse_value(triton_value_t* value, triton_lexer_t* lexer);
+
+triton_parse_result_t triton_parse_json(triton_json_t* json, const char* string);
+
+#ifdef TRITON_IMPLEMENTATION
+
+// Lexer
+void triton_skip_whitespace(triton_lexer_t* lexer) {
+    while (isspace(lexer->input[lexer->pointer])) {
+        lexer->pointer++;
     }
 }
 
-char *triton_extract_string(const char **input) {
-    const char *start = ++(*input);  // Skip the initial "
-    while (**input != '"' && **input != '\0') {
-        (*input)++;
+char *triton_extract_string(triton_lexer_t* lexer) {
+    int start = ++lexer->pointer;  // Skip the initial "
+    while (lexer->input[lexer->pointer] != '"' && lexer->input[lexer->pointer] != '\0') {
+        lexer->pointer++;
     }
-    if (**input == '\0') {
+    if (lexer->input[lexer->pointer] == '\0') {
         return NULL; // Unterminated string
     }
 
-    size_t length = *input - start;
+    int length = lexer->pointer - start;
     char *string = malloc(length + 1 + 2);
     string[0] = '"';
-    strncpy(string + 1, start, length);
+    strncpy(string + 1, lexer->input + start, length);
     string[length+1] = '"'; // Todo probably we do not need to do that
     string[length+2] = '\0'; // Todo probably we do not need to do that
 
-    (*input)++;  // Skip the closing "
+    lexer->pointer++;  // Skip the closing "
     return string;
 }
 
-triton_token_t triton_next_token(const char **input) {
-    triton_skip_whitespace(input);
+triton_token_t triton_next_token(triton_lexer_t* lexer) {
+    triton_skip_whitespace(lexer);
 
     triton_token_t token;
     token.lexeme = NULL;
 
-    switch (**input) {
+    switch (lexer->input[lexer->pointer]) {
         case '{':
             token.type = TRITON_TOKEN_LBRACE;
-            (*input)++;
+            lexer->pointer++;
             break;
         case '}':
             token.type = TRITON_TOKEN_RBRACE;
-            (*input)++;
+            lexer->pointer++;
             break;
         case '[':
             token.type = TRITON_TOKEN_LBRACKET;
-            (*input)++;
+            lexer->pointer++;
             break;
         case ']':
             token.type = TRITON_TOKEN_RBRACKET;
-            (*input)++;
+            lexer->pointer++;
             break;
         case ':':
             token.type = TRITON_TOKEN_COLON;
-            (*input)++;
+            lexer->pointer++;
             break;
         case ',':
             token.type = TRITON_TOKEN_COMMA;
-            (*input)++;
+            lexer->pointer++;
             break;
         case '"':
             token.type = TRITON_TOKEN_STRING;
-            token.lexeme = triton_extract_string(input);
+            token.lexeme = triton_extract_string(lexer);
             if (token.lexeme == NULL) {
                 token.type = TRITON_TOKEN_ERROR;
             }
@@ -133,49 +172,259 @@ triton_token_t triton_next_token(const char **input) {
             break;
         default:
             // Handle numbers, true, false, null
-            if (isdigit(**input) || **input == '-') {
+            if (isdigit(lexer->input[lexer->pointer]) || lexer->input[lexer->pointer] == '-') {
                 // Parse a number
-                const char *start = *input;
-                if (**input == '-') (*input)++;
-                while (isdigit(**input)) (*input)++;
-                if (**input == '.') {
-                    (*input)++;
-                    while (isdigit(**input)) (*input)++;
+                int start = lexer->pointer;
+                if (lexer->input[lexer->pointer] == '-') lexer->pointer++;
+                while (isdigit(lexer->input[lexer->pointer])) lexer->pointer++;
+                if (lexer->input[lexer->pointer] == '.') {
+                    lexer->pointer++;
+                    while (isdigit(lexer->input[lexer->pointer])) lexer->pointer++;
                 }
-                size_t length = *input - start;
+                int length = lexer->pointer - start;
                 token.lexeme = malloc(length + 1);
-                strncpy(token.lexeme, start, length);
+                strncpy(token.lexeme, lexer->input + lexer->pointer, length);
                 token.lexeme[length] = '\0';
                 token.type = TRITON_TOKEN_NUMBER;
-            } else if (strncmp(*input, "true", 4) == 0) {
+            } else if (strncmp(lexer->input + lexer->pointer, "true", 4) == 0) {
                 token.type = TRITON_TOKEN_TRUE;
-                (*input) += 4;
-            } else if (strncmp(*input, "false", 5) == 0) {
+                lexer->pointer += 4;
+            } else if (strncmp(lexer->input + lexer->pointer, "false", 5) == 0) {
                 token.type = TRITON_TOKEN_FALSE;
-                (*input) += 5;
-            } else if (strncmp(*input, "null", 4) == 0) {
+                lexer->pointer += 5;
+            } else if (strncmp(lexer->input + lexer->pointer, "null", 4) == 0) {
                 token.type = TRITON_TOKEN_NULL;
-                (*input) += 4;
+                lexer->pointer += 4;
             } else {
                 token.type = TRITON_TOKEN_ERROR;
             }
+
             break;
     }
 
     return token;
 }
 
-typedef struct {
+// Parser
+triton_parse_result_t triton_parse_string(triton_value_t* value, triton_lexer_t* lexer) {
+    triton_lexer_t backup = *lexer;
 
-} triton_json_t;
+    triton_token_t token = triton_next_token(lexer);
 
-typedef enum {
-    TRITON_OK,
-    TRITON_ERROR,
-} triton_result_code_t;
+    if(token.type == TRITON_TOKEN_STRING) {
+        value->type = TRITON_PRIMITIVE_VALUE;
+        return (triton_parse_result_t) { TRITON_OK };
+    }
+    
+    *lexer = backup;
 
-typedef struct {
-    triton_result_code_t code;
-} triton_result_t;
+    return (triton_parse_result_t) { TRITON_ERROR };
+}
+
+triton_parse_result_t triton_parse_number(triton_value_t* value, triton_lexer_t* lexer) {
+    triton_lexer_t backup = *lexer;
+
+    triton_token_t token = triton_next_token(lexer);
+
+    if(token.type == TRITON_TOKEN_NUMBER) {
+        value->type = TRITON_PRIMITIVE_VALUE;
+        return (triton_parse_result_t) { TRITON_OK };
+    }
+    
+    *lexer = backup;
+
+    return (triton_parse_result_t) { TRITON_ERROR };
+}
+
+triton_parse_result_t triton_parse_object(triton_value_t* value, triton_lexer_t* lexer) {
+    triton_lexer_t backup = *lexer;
+
+    triton_token_t token = triton_next_token(lexer);
+    
+    if(token.type != TRITON_TOKEN_LBRACE) {
+        *lexer = backup;
+        return (triton_parse_result_t) { TRITON_ERROR };
+    }
+
+    int i = 0;
+    for(;;++i) {
+        // if(i != 0) {
+        //     backup = *lexer;
+        //     token = triton_next_token(lexer);
+// 
+        //     if(token.type != TRITON_TOKEN_COMMA) {
+        //         *lexer = backup;
+        //         break;
+        //     }
+        // }
+// 
+        // backup = *lexer;
+        // triton_parse_result_t result = triton_parse_value(value, lexer);
+// 
+        // if(result.code == TRITON_ERROR) {
+        //     *lexer = backup;
+        //     break;
+        // }
+
+        break;
+    }
+
+    backup = *lexer;
+    token = triton_next_token(lexer);
+    if(token.type != TRITON_TOKEN_RBRACE) {
+        *lexer = backup;
+        return (triton_parse_result_t) { TRITON_ERROR };
+    }
+
+    value->type = TRITON_OBJECT_VALUE;
+
+    value->as.object.count = i;
+    value->as.object.entries = NULL; // Todo
+
+    return (triton_parse_result_t) { TRITON_OK };
+}
+
+triton_parse_result_t triton_parse_array(triton_value_t* value, triton_lexer_t* lexer) {
+    triton_lexer_t backup = *lexer;
+
+    triton_token_t token = triton_next_token(lexer);
+    
+    if(token.type != TRITON_TOKEN_LBRACKET) {
+        *lexer = backup;
+        return (triton_parse_result_t) { TRITON_ERROR };
+    }
+
+    int i = 0;
+    for(;;++i) {
+        if(i != 0) {
+            backup = *lexer;
+            token = triton_next_token(lexer);
+
+            if(token.type != TRITON_TOKEN_COMMA) {
+                *lexer = backup;
+                break;
+            }
+        }
+
+        backup = *lexer;
+        triton_parse_result_t result = triton_parse_value(value, lexer);
+
+        if(result.code == TRITON_ERROR) {
+            *lexer = backup;
+            break;
+        }
+    }
+
+    backup = *lexer;
+    token = triton_next_token(lexer);
+    if(token.type != TRITON_TOKEN_RBRACKET) {
+        *lexer = backup;
+        return (triton_parse_result_t) { TRITON_ERROR };
+    }
+
+    value->type = TRITON_ARRAY_VALUE;
+
+    value->as.array.count = i;
+    value->as.array.entries = NULL; // Todo
+
+    return (triton_parse_result_t) { TRITON_OK };
+}
+
+triton_parse_result_t triton_parse_true(triton_value_t* value, triton_lexer_t* lexer) {
+    triton_lexer_t backup = *lexer;
+
+    triton_token_t token = triton_next_token(lexer);
+
+    if(token.type == TRITON_TOKEN_TRUE) {
+        value->type = TRITON_PRIMITIVE_VALUE;
+        return (triton_parse_result_t) { TRITON_OK };
+    }
+    
+    *lexer = backup;
+
+    return (triton_parse_result_t) { TRITON_ERROR };
+}
+
+triton_parse_result_t triton_parse_false(triton_value_t* value, triton_lexer_t* lexer) {
+    triton_lexer_t backup = *lexer;
+
+    triton_token_t token = triton_next_token(lexer);
+
+    if(token.type == TRITON_TOKEN_FALSE) {
+        value->type = TRITON_PRIMITIVE_VALUE;
+        return (triton_parse_result_t) { TRITON_OK };
+    }
+    
+    *lexer = backup;
+
+    return (triton_parse_result_t) { TRITON_ERROR };
+}
+
+triton_parse_result_t triton_parse_null(triton_value_t* value, triton_lexer_t* lexer) {
+    triton_lexer_t backup = *lexer;
+
+    triton_token_t token = triton_next_token(lexer);
+
+    if(token.type == TRITON_TOKEN_NULL) {
+        value->type = TRITON_PRIMITIVE_VALUE;
+        return (triton_parse_result_t) { TRITON_OK };
+    }
+    
+    *lexer = backup;
+
+    return (triton_parse_result_t) { TRITON_ERROR };
+}
+
+triton_parse_result_t triton_parse_value(triton_value_t* value, triton_lexer_t* lexer) {
+    if(triton_parse_string(value, lexer).code == TRITON_OK) {
+        
+        return (triton_parse_result_t) { TRITON_OK };
+    }
+
+    if(triton_parse_number(value, lexer).code == TRITON_OK) {
+        
+        return (triton_parse_result_t) { TRITON_OK };
+    }
+
+    if(triton_parse_object(value, lexer).code == TRITON_OK) {
+        
+        return (triton_parse_result_t) { TRITON_OK };
+    }
+
+    if(triton_parse_array(value, lexer).code == TRITON_OK) {
+        
+        return (triton_parse_result_t) { TRITON_OK };
+    }
+
+    if(triton_parse_true(value, lexer).code == TRITON_OK) {
+        
+        return (triton_parse_result_t) { TRITON_OK };
+    }
+
+    if(triton_parse_false(value, lexer).code == TRITON_OK) {
+        
+        return (triton_parse_result_t) { TRITON_OK };
+    }
+
+    if(triton_parse_null(value, lexer).code == TRITON_OK) {
+        
+        return (triton_parse_result_t) { TRITON_OK };
+    }
+
+    return (triton_parse_result_t) { TRITON_ERROR };
+}
+
+triton_parse_result_t triton_parse_json(triton_json_t* json, const char* string) {
+    const char *input = string;
+
+    triton_lexer_t lexer = (triton_lexer_t) {
+        .input   = string,
+        .pointer = 0
+    };
+
+    return triton_parse_value(&json->value, &lexer);
+}
+
+#endif
 
 #endif
