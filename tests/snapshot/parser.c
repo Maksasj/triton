@@ -8,18 +8,35 @@ int main(int argc, char *argv[]) {
 
     if(argc >= 2)
         stream = fopen(argv[1], "r");
-    else 
+    else {
         fprintf(stderr, "ERROR");
+        return 1;
+    }
+
+    char* buffer = 0;
+    long length;
+
+    fseek (stream, 0, SEEK_END);
+    length = ftell(stream);
+    fseek (stream, 0, SEEK_SET);
+    buffer = malloc (length);
+    if (buffer == NULL) {
+    fprintf(stderr, "ERROR");
+        return 1;
+    }
+
+    fread (buffer, 1, length, stream);
 
     triton_json_t json;
+    triton_parse_result_t result = triton_parse_json(&json, buffer);
 
-    // if(triton_parse(&json, stream).code = TRITON_ERROR) {
-    //     printf("Failed to parse");
-    // } else {
-    //     printf("Parse succeeded");
-    // }
+    if(result.code = TRITON_ERROR) {
+        printf("Failed to parse");
+    } else {
+        printf("Parse succeeded");
+    }
 
-    // triton_free_json(&json);
+    fclose (stream);
 
     return 0;
 }
