@@ -98,6 +98,8 @@ typedef double triton_number_t;
 typedef char* triton_string_t;
 typedef unsigned char triton_boolean_t;
 
+triton_boolean_t triton_in_range_include(char value, char min, char max);
+
 struct triton_value_t {
     triton_value_type_t type;
 
@@ -148,6 +150,11 @@ void triton_stringify_value(FILE* stream, triton_value_t* value);
 void triton_stringify_json(FILE* stream, triton_json_t* json);
 
 #ifdef TRITON_IMPLEMENTATION
+
+// Utils
+triton_boolean_t triton_in_range_include(char value, char min, char max) {
+    return (value >= min) && (value <= max); 
+}
 
 void create_container_base(triton_container_base_t* container_base, int initial_capacity) {
     assert(initial_capacity > 0);
@@ -406,35 +413,58 @@ triton_lex_result_t triton_lex_eof(triton_token_t* token, triton_lexer_t* lexer)
 }
 
 triton_lex_result_t triton_lex_number(triton_token_t* token, triton_lexer_t* lexer) {
-    if (isdigit(lexer->input[lexer->pointer]) || lexer->input[lexer->pointer] == '-') {
-        // Parse a number
-        int start = lexer->pointer;
-        
-        if (lexer->input[lexer->pointer] == '-') 
-            lexer->pointer++;
-        
-        while (isdigit(lexer->input[lexer->pointer])) 
-            lexer->pointer++;
-        
-        if (lexer->input[lexer->pointer] == '.') {
-            lexer->pointer++;
+    char first_symbol = lexer->input[lexer->pointer];
 
-            while (isdigit(lexer->input[lexer->pointer])) 
-                lexer->pointer++;
-        }
+    if (!isdigit(first_symbol) && first_symbol != '-') 
+        return (triton_lex_result_t) { TRITON_ERROR };
+
+    int start = lexer->pointer;
+    ++lexer->pointer;
+
+    if(first_symbol == '0') {
         
-        int length = lexer->pointer - start;
+    } else {
+        if(triton_in_range_include(lexer->input[lexer->pointer], '1', '9'))
+            ++lexer->pointer;
 
-        token->lexeme = malloc(length + 1);
-        strncpy(token->lexeme, &lexer->input[start], length);
-
-        token->lexeme[length] = '\0';
-        token->type = TRITON_TOKEN_NUMBER;
-
-        return (triton_lex_result_t) { TRITON_OK };
+        while(isdigit(lexer->input[lexer->pointer]))
+            ++lexer->pointer;
     }
 
-    return (triton_lex_result_t) { TRITON_ERROR };
+    // fraction part
+    if(lexer->input[lexer->pointer] == '.') {
+        ++lexer->pointer;
+
+        while(isdigit(lexer->input[lexer->pointer]))
+            ++lexer->pointer;
+    }
+
+    // exponent
+    char exponent = lexer->input[lexer->pointer];
+    if(exponent == 'e' || exponent == 'E') {
+        ++lexer->pointer;
+
+        char symbol = lexer->input[lexer->pointer];
+
+        if((symbol != '+') && (symbol != '-') && !isdigit(symbol))
+            return (triton_lex_result_t) { TRITON_ERROR };
+
+        ++lexer->pointer;
+
+        while(isdigit(lexer->input[lexer->pointer]))
+            ++lexer->pointer;
+    }
+
+    // Save lexeme
+    int length = lexer->pointer - start;
+
+    token->lexeme = malloc(length + 1);
+    strncpy(token->lexeme, &lexer->input[start], length);
+
+    token->lexeme[length] = '\0';
+    token->type = TRITON_TOKEN_NUMBER;
+
+    return (triton_lex_result_t) { TRITON_OK };
 }
 
 triton_lex_result_t triton_lex_true(triton_token_t* token, triton_lexer_t* lexer) {
@@ -469,7 +499,7 @@ triton_lex_result_t triton_lex_null(triton_token_t* token, triton_lexer_t* lexer
     token->lexeme = NULL;
 
     lexer->pointer += 4;
-    
+
     return (triton_lex_result_t) { TRITON_OK };
 }
 
@@ -516,91 +546,6 @@ triton_token_t triton_next_token(triton_lexer_t* lexer) {
     if(triton_lex_null(&token, lexer).code == TRITON_OK)
         return token;
     
-    return token;
-    
-    switch (lexer->input[lexer->pointer]) {
-        case '{':
-            token.type = TRITON_TOKEN_LBRACE;
-            lexer->pointer++;
-            break;
-        case '}':
-            token.type = TRITON_TOKEN_RBRACE;
-            lexer->pointer++;
-            break;
-        case '[':
-            token.type = TRITON_TOKEN_LBRACKET;
-            lexer->pointer++;
-            break;
-        case ']':
-            token.type = TRITON_TOKEN_RBRACKET;
-            lexer->pointer++;
-            break;
-        case ':':
-            token.type = TRITON_TOKEN_COLON;
-            lexer->pointer++;
-            break;
-        case ',':
-            token.type = TRITON_TOKEN_COMMA;
-            lexer->pointer++;
-            break;
-        case '"':
-            token.type = TRITON_TOKEN_STRING;
-            token.lexeme = triton_extract_string(lexer);
-            if (token.lexeme == NULL) {
-                token.type = TRITON_TOKEN_ERROR;
-            }
-            break;
-        case '\0':
-            token.type = TRITON_TOKEN_EOF;
-            break;
-        default:
-            // Handle numbers, true, false, null
-            if (isdigit(lexer->input[lexer->pointer]) || lexer->input[lexer->pointer] == '-') {
-                // Parse a number
-                int start = lexer->pointer;
-                
-                if (lexer->input[lexer->pointer] == '-') 
-                    lexer->pointer++;
-                
-                while (isdigit(lexer->input[lexer->pointer])) 
-                    lexer->pointer++;
-                
-                if (lexer->input[lexer->pointer] == '.') {
-                    lexer->pointer++;
-
-                    while (isdigit(lexer->input[lexer->pointer])) 
-                        lexer->pointer++;
-                }
-                
-                int length = lexer->pointer - start;
-
-                token.lexeme = malloc(length + 1);
-                strncpy(token.lexeme, &lexer->input[start], length);
-
-                token.lexeme[length] = '\0';
-                token.type = TRITON_TOKEN_NUMBER;
-            } else if (strncmp(lexer->input + lexer->pointer, "true", 4) == 0) {
-                token.type = TRITON_TOKEN_TRUE;
-                token.lexeme = "true";
-                
-                lexer->pointer += 4;
-            } else if (strncmp(lexer->input + lexer->pointer, "false", 5) == 0) {
-                token.type = TRITON_TOKEN_FALSE;
-                token.lexeme = "false";
-                
-                lexer->pointer += 5;
-            } else if (strncmp(lexer->input + lexer->pointer, "null", 4) == 0) {
-                token.type = TRITON_TOKEN_NULL;
-                token.lexeme = "null";
-
-                lexer->pointer += 4;
-            } else {
-                token.type = TRITON_TOKEN_ERROR;
-            }
-
-            break;
-    }
-
     return token;
 }
 
