@@ -5,9 +5,8 @@
 
 #include <string.h>
 #include <ctype.h>
-
-#define HAUL_IMPLEMETATION
-#include "vector.h"
+#include <stdlib.h>
+#include <assert.h>
 
 // Lexer
 typedef enum {
@@ -386,18 +385,68 @@ triton_lex_result_t triton_lex_comma(triton_token_t* token, triton_lexer_t* lexe
 }
 
 triton_lex_result_t triton_lex_string(triton_token_t* token, triton_lexer_t* lexer) {
-    if(lexer->input[lexer->pointer] == '"') {
-        token->type = TRITON_TOKEN_STRING;
-        token->lexeme = triton_extract_string(lexer);
+    if (lexer->input[lexer->pointer] != '"') 
+        return (triton_lex_result_t) { TRITON_ERROR };
 
-        if (token->lexeme == NULL) {
-            token->type = TRITON_TOKEN_ERROR;
-        }
+    int start = lexer->pointer;
+    ++lexer->pointer;
 
-        return (triton_lex_result_t) { TRITON_OK };
+    while(1) {
+        char symbol = lexer->input[lexer->pointer];
+
+        if(symbol == '"')
+            break;
+
+        if(symbol == '\\') {
+            symbol = lexer->input[++lexer->pointer];
+
+            if(symbol == '"')
+                ++lexer->pointer;
+            else if(symbol == '\\')
+                ++lexer->pointer;
+            else if(symbol == '/')
+                ++lexer->pointer;
+            else if(symbol == 'b')
+                ++lexer->pointer;
+            else if(symbol == 'f')
+                ++lexer->pointer;
+            else if(symbol == 'n')
+                ++lexer->pointer;
+            else if(symbol == 'r')
+                ++lexer->pointer;
+            else if(symbol == 't')
+                ++lexer->pointer;
+            else if(symbol == 'u') {
+                ++lexer->pointer;
+
+                for(int i = 0; i < 4; ++i) {
+                    symbol = lexer->input[lexer->pointer];
+
+                    if(!triton_in_range_include(symbol, '0', '9') && !triton_in_range_include(tolower(symbol), 'a', 'f'))
+                        return (triton_lex_result_t) { TRITON_ERROR };
+                    
+                    ++lexer->pointer;
+                }
+            } else {
+                return (triton_lex_result_t) { TRITON_ERROR };
+            }
+        } 
+
+        ++lexer->pointer;
     }
 
-    return (triton_lex_result_t) { TRITON_ERROR };
+   ++lexer->pointer;
+
+    // Save lexeme
+    int length = lexer->pointer - start;
+
+    token->lexeme = malloc(length + 1);
+    strncpy(token->lexeme, &lexer->input[start], length);
+
+    token->lexeme[length] = '\0';
+    token->type = TRITON_TOKEN_STRING;
+   
+    return (triton_lex_result_t) { TRITON_OK };
 }
 
 triton_lex_result_t triton_lex_eof(triton_token_t* token, triton_lexer_t* lexer) {

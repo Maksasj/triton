@@ -489,7 +489,7 @@ int lexer_string_accepted_surrogate_pairs() {
 
 int lexer_string_allowed_escapes() {
     triton_lexer_t lexer = (triton_lexer_t) {
-        .input = "\"\"\\\\/\b\f\n\r\t\"",
+        .input = "\"\\\"\\\\/\b\f\n\r\t\"",
         .pointer = 0
     };
 
@@ -515,9 +515,9 @@ int lexer_string_backslash_and_u_escaped_zero() {
     return OK;
 }
 
-int lexer_string_backslash_doublequotes() {
+int lexer_string_backslash_double_quotes() {
     triton_lexer_t lexer = (triton_lexer_t) {
-        .input = "\"\"\"",
+        .input = "\"\\\"\"",
         .pointer = 0
     };
 
@@ -2469,7 +2469,7 @@ int lex_string_literals_accepted_group() {
     RUN_TEST(lexer_string_accepted_surrogate_pairs);
     RUN_TEST(lexer_string_allowed_escapes);
     RUN_TEST(lexer_string_backslash_and_u_escaped_zero);
-    RUN_TEST(lexer_string_backslash_doublequotes);
+    RUN_TEST(lexer_string_backslash_double_quotes);
     RUN_TEST(lexer_string_comments);
     RUN_TEST(lexer_string_double_escape_a);
     RUN_TEST(lexer_string_double_escape_n);
