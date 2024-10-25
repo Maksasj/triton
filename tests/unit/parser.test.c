@@ -15,7 +15,7 @@ int parse_string() {
     triton_parse_result_t result = triton_parse_string(&value, &lexer);
 
     ENSURE_EQ(result.code, TRITON_OK);
-    ENSURE_EQ(value.type, TRITON_PRIMITIVE_VALUE);
+    ENSURE_EQ(value.type, TRITON_STRING_VALUE);
 
     return OK;
 }
@@ -30,7 +30,7 @@ int parse_number() {
     triton_parse_result_t result = triton_parse_number(&value, &lexer);
 
     ENSURE_EQ(result.code, TRITON_OK);
-    ENSURE_EQ(value.type, TRITON_PRIMITIVE_VALUE);
+    ENSURE_EQ(value.type, TRITON_NUMBER_VALUE);
 
     return OK;
 }
@@ -282,7 +282,8 @@ int parse_true() {
     triton_parse_result_t result = triton_parse_true(&value, &lexer);
 
     ENSURE_EQ(result.code, TRITON_OK);
-    ENSURE_EQ(value.type, TRITON_PRIMITIVE_VALUE);
+    ENSURE_EQ(value.type, TRITON_BOOLEAN_VALUE);
+    ENSURE_EQ(value.as.boolean, TRITON_TRUE);
 
     return OK;
 }
@@ -297,7 +298,8 @@ int parse_false() {
     triton_parse_result_t result = triton_parse_false(&value, &lexer);
 
     ENSURE_EQ(result.code, TRITON_OK);
-    ENSURE_EQ(value.type, TRITON_PRIMITIVE_VALUE);
+    ENSURE_EQ(value.type, TRITON_BOOLEAN_VALUE);
+    ENSURE_EQ(value.as.boolean, TRITON_FALSE);
 
     return OK;
 }
@@ -312,7 +314,7 @@ int parse_null() {
     triton_parse_result_t result = triton_parse_null(&value, &lexer);
 
     ENSURE_EQ(result.code, TRITON_OK);
-    ENSURE_EQ(value.type, TRITON_PRIMITIVE_VALUE);
+    ENSURE_EQ(value.type, TRITON_NULL_VALUE);
     
     return OK;
 }

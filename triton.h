@@ -83,20 +83,28 @@ void free_triton_object(triton_object_t* triton_object);
 void free_triton_object_content(triton_object_t* triton_object);
 
 typedef enum {
-    TRITON_PRIMITIVE_VALUE,
+    TRITON_NUMBER_VALUE,
+    TRITON_STRING_VALUE,
+    TRITON_BOOLEAN_VALUE,
+    TRITON_NULL_VALUE,
     TRITON_ARRAY_VALUE,
     TRITON_OBJECT_VALUE,
 } triton_value_type_t;
 
-typedef struct {
-    const char* lexeme;
-} triton_primitive_t;
+#define TRITON_TRUE 1
+#define TRITON_FALSE 0
+
+typedef double triton_number_t;
+typedef char* triton_string_t;
+typedef unsigned char triton_boolean_t;
 
 struct triton_value_t {
     triton_value_type_t type;
 
     union {
-        triton_primitive_t primitive;
+        triton_number_t number;
+        triton_string_t string;
+        triton_boolean_t boolean;
         triton_array_t array;
         triton_object_t object;
     } as;
@@ -115,6 +123,10 @@ typedef enum {
     TRITON_OK,
     TRITON_ERROR
 } triton_result_code_t;
+
+typedef struct {
+    triton_result_code_t code;
+} triton_lex_result_t;
 
 typedef struct {
     triton_result_code_t code;
@@ -274,31 +286,238 @@ void triton_skip_whitespace(triton_lexer_t* lexer) {
 }
 
 char *triton_extract_string(triton_lexer_t* lexer) {
-    int start = ++lexer->pointer;  // Skip the initial "
+    int start = ++lexer->pointer;  // Skip the initial ".
+
     while (lexer->input[lexer->pointer] != '"' && lexer->input[lexer->pointer] != '\0') {
         lexer->pointer++;
     }
+    
     if (lexer->input[lexer->pointer] == '\0') {
-        return NULL; // Unterminated string
+        return NULL;
     }
 
     int length = lexer->pointer - start;
-    char *string = malloc(length + 1 + 2);
-    string[0] = '"';
-    strncpy(string + 1, lexer->input + start, length);
-    string[length+1] = '"'; // Todo probably we do not need to do that
-    string[length+2] = '\0'; // Todo probably we do not need to do that
+    char *string = malloc(length + 1);
+
+    strncpy(string, lexer->input + start, length);
+    string[length] = '\0'; // Todo probably we do not need to do that
 
     lexer->pointer++;  // Skip the closing "
     return string;
+}
+
+triton_lex_result_t triton_lex_lbrace(triton_token_t* token, triton_lexer_t* lexer) {
+    if(lexer->input[lexer->pointer] != '{')
+        return (triton_lex_result_t) { TRITON_ERROR };
+
+    token->type = TRITON_TOKEN_LBRACE;
+    token->lexeme = NULL;
+
+    lexer->pointer++;
+
+    return (triton_lex_result_t) { TRITON_OK };
+}
+
+triton_lex_result_t triton_lex_rbrace(triton_token_t* token, triton_lexer_t* lexer) {
+    if(lexer->input[lexer->pointer] != '}')
+        return (triton_lex_result_t) { TRITON_ERROR };
+
+    token->type = TRITON_TOKEN_RBRACE;
+    token->lexeme = NULL;
+
+    lexer->pointer++;
+
+    return (triton_lex_result_t) { TRITON_OK };
+}
+
+triton_lex_result_t triton_lex_lbracket(triton_token_t* token, triton_lexer_t* lexer) {
+    if(lexer->input[lexer->pointer] != '[')
+        return (triton_lex_result_t) { TRITON_ERROR };
+
+    token->type = TRITON_TOKEN_LBRACKET;
+    token->lexeme = NULL;
+
+    lexer->pointer++;
+
+    return (triton_lex_result_t) { TRITON_OK };
+}
+
+triton_lex_result_t triton_lex_rbracket(triton_token_t* token, triton_lexer_t* lexer) {
+    if(lexer->input[lexer->pointer] != ']')
+        return (triton_lex_result_t) { TRITON_ERROR };
+
+    token->type = TRITON_TOKEN_RBRACKET;
+    token->lexeme = NULL;
+
+    lexer->pointer++;
+
+    return (triton_lex_result_t) { TRITON_OK };
+}
+
+triton_lex_result_t triton_lex_colon(triton_token_t* token, triton_lexer_t* lexer) {
+    if(lexer->input[lexer->pointer] != ':')
+        return (triton_lex_result_t) { TRITON_ERROR };
+
+    token->type = TRITON_TOKEN_COLON;
+    token->lexeme = NULL;
+
+    lexer->pointer++;
+
+    return (triton_lex_result_t) { TRITON_OK };
+}
+
+triton_lex_result_t triton_lex_comma(triton_token_t* token, triton_lexer_t* lexer) {
+    if(lexer->input[lexer->pointer] != ',')
+        return (triton_lex_result_t) { TRITON_ERROR };
+
+    token->type = TRITON_TOKEN_COMMA;
+    token->lexeme = NULL;
+
+    lexer->pointer++;
+
+    return (triton_lex_result_t) { TRITON_OK };
+}
+
+triton_lex_result_t triton_lex_string(triton_token_t* token, triton_lexer_t* lexer) {
+    if(lexer->input[lexer->pointer] == '"') {
+        token->type = TRITON_TOKEN_STRING;
+        token->lexeme = triton_extract_string(lexer);
+
+        if (token->lexeme == NULL) {
+            token->type = TRITON_TOKEN_ERROR;
+        }
+
+        return (triton_lex_result_t) { TRITON_OK };
+    }
+
+    return (triton_lex_result_t) { TRITON_ERROR };
+}
+
+triton_lex_result_t triton_lex_eof(triton_token_t* token, triton_lexer_t* lexer) {
+    if(lexer->input[lexer->pointer] != '\0')
+        return (triton_lex_result_t) { TRITON_ERROR };
+
+    token->type = TRITON_TOKEN_EOF;
+    token->lexeme = NULL;
+
+    lexer->pointer++;
+
+    return (triton_lex_result_t) { TRITON_OK };
+}
+
+triton_lex_result_t triton_lex_number(triton_token_t* token, triton_lexer_t* lexer) {
+    if (isdigit(lexer->input[lexer->pointer]) || lexer->input[lexer->pointer] == '-') {
+        // Parse a number
+        int start = lexer->pointer;
+        
+        if (lexer->input[lexer->pointer] == '-') 
+            lexer->pointer++;
+        
+        while (isdigit(lexer->input[lexer->pointer])) 
+            lexer->pointer++;
+        
+        if (lexer->input[lexer->pointer] == '.') {
+            lexer->pointer++;
+
+            while (isdigit(lexer->input[lexer->pointer])) 
+                lexer->pointer++;
+        }
+        
+        int length = lexer->pointer - start;
+
+        token->lexeme = malloc(length + 1);
+        strncpy(token->lexeme, &lexer->input[start], length);
+
+        token->lexeme[length] = '\0';
+        token->type = TRITON_TOKEN_NUMBER;
+
+        return (triton_lex_result_t) { TRITON_OK };
+    }
+
+    return (triton_lex_result_t) { TRITON_ERROR };
+}
+
+triton_lex_result_t triton_lex_true(triton_token_t* token, triton_lexer_t* lexer) {
+    if(strncmp(lexer->input + lexer->pointer, "true", 4) != 0)
+        return (triton_lex_result_t) { TRITON_ERROR };
+
+    token->type = TRITON_TOKEN_TRUE;
+    token->lexeme = NULL;
+
+    lexer->pointer += 4;
+
+    return (triton_lex_result_t) { TRITON_OK };
+}
+
+triton_lex_result_t triton_lex_false(triton_token_t* token, triton_lexer_t* lexer) {
+    if(strncmp(lexer->input + lexer->pointer, "false", 5) != 0)
+        return (triton_lex_result_t) { TRITON_ERROR };
+
+    token->type = TRITON_TOKEN_FALSE;
+    token->lexeme = NULL;
+
+    lexer->pointer += 5;
+
+    return (triton_lex_result_t) { TRITON_OK };
+}
+
+triton_lex_result_t triton_lex_null(triton_token_t* token, triton_lexer_t* lexer) {
+    if(strncmp(lexer->input + lexer->pointer, "null", 4) != 0)
+        return (triton_lex_result_t) { TRITON_ERROR };
+
+    token->type = TRITON_TOKEN_NULL;
+    token->lexeme = NULL;
+
+    lexer->pointer += 4;
+    
+    return (triton_lex_result_t) { TRITON_OK };
 }
 
 triton_token_t triton_next_token(triton_lexer_t* lexer) {
     triton_skip_whitespace(lexer);
 
     triton_token_t token;
+    token.type = TRITON_TOKEN_ERROR;
     token.lexeme = NULL;
 
+    if(triton_lex_lbrace(&token, lexer).code == TRITON_OK)
+        return token;
+    
+    if(triton_lex_rbrace(&token, lexer).code == TRITON_OK)
+        return token;
+    
+    if(triton_lex_lbracket(&token, lexer).code == TRITON_OK)
+        return token;
+    
+    if(triton_lex_rbracket(&token, lexer).code == TRITON_OK)
+        return token;
+    
+    if(triton_lex_colon(&token, lexer).code == TRITON_OK)
+        return token;
+    
+    if(triton_lex_comma(&token, lexer).code == TRITON_OK)
+        return token;
+    
+    if(triton_lex_string(&token, lexer).code == TRITON_OK)
+        return token;
+    
+    if(triton_lex_eof(&token, lexer).code == TRITON_OK)
+        return token;
+    
+    if(triton_lex_number(&token, lexer).code == TRITON_OK)
+        return token;
+    
+    if(triton_lex_true(&token, lexer).code == TRITON_OK)
+        return token;
+    
+    if(triton_lex_false(&token, lexer).code == TRITON_OK)
+        return token;
+    
+    if(triton_lex_null(&token, lexer).code == TRITON_OK)
+        return token;
+    
+    return token;
+    
     switch (lexer->input[lexer->pointer]) {
         case '{':
             token.type = TRITON_TOKEN_LBRACE;
@@ -406,8 +625,8 @@ triton_parse_result_t triton_parse_string(triton_value_t* value, triton_lexer_t*
     triton_token_t token = triton_next_token(lexer);
 
     if(token.type == TRITON_TOKEN_STRING) {
-        value->type = TRITON_PRIMITIVE_VALUE;
-        value->as.primitive.lexeme = token.lexeme;
+        value->type = TRITON_STRING_VALUE;
+        value->as.string = token.lexeme;
         return (triton_parse_result_t) { TRITON_OK };
     }
     
@@ -422,8 +641,8 @@ triton_parse_result_t triton_parse_number(triton_value_t* value, triton_lexer_t*
     triton_token_t token = triton_next_token(lexer);
 
     if(token.type == TRITON_TOKEN_NUMBER) {
-        value->type = TRITON_PRIMITIVE_VALUE;
-        value->as.primitive.lexeme = token.lexeme;
+        value->type = TRITON_NUMBER_VALUE;
+        value->as.number = 1.0f;
         return (triton_parse_result_t) { TRITON_OK };
     }
     
@@ -460,7 +679,7 @@ triton_parse_result_t triton_parse_object(triton_value_t* value, triton_lexer_t*
             break;
 
         triton_value_entry_t* actual = (triton_value_entry_t*) malloc(sizeof(triton_value_entry_t));
-        actual->name = key_value.as.primitive.lexeme;
+        actual->name = key_value.as.string;
         actual->value = entry_value;
         triton_array_push(&object, actual);
     }
@@ -516,8 +735,8 @@ triton_parse_result_t triton_parse_true(triton_value_t* value, triton_lexer_t* l
     triton_token_t token = triton_next_token(lexer);
 
     if(token.type == TRITON_TOKEN_TRUE) {
-        value->type = TRITON_PRIMITIVE_VALUE;
-        value->as.primitive.lexeme = token.lexeme;
+        value->type = TRITON_BOOLEAN_VALUE;
+        value->as.boolean = TRITON_TRUE;
         return (triton_parse_result_t) { TRITON_OK };
     }
     
@@ -532,8 +751,8 @@ triton_parse_result_t triton_parse_false(triton_value_t* value, triton_lexer_t* 
     triton_token_t token = triton_next_token(lexer);
 
     if(token.type == TRITON_TOKEN_FALSE) {
-        value->type = TRITON_PRIMITIVE_VALUE;
-        value->as.primitive.lexeme = token.lexeme;
+        value->type = TRITON_BOOLEAN_VALUE;
+        value->as.boolean = TRITON_FALSE;
         return (triton_parse_result_t) { TRITON_OK };
     }
     
@@ -548,8 +767,7 @@ triton_parse_result_t triton_parse_null(triton_value_t* value, triton_lexer_t* l
     triton_token_t token = triton_next_token(lexer);
 
     if(token.type == TRITON_TOKEN_NULL) {
-        value->type = TRITON_PRIMITIVE_VALUE;
-        value->as.primitive.lexeme = token.lexeme;
+        value->type = TRITON_NULL_VALUE;
         return (triton_parse_result_t) { TRITON_OK };
     }
     
@@ -610,8 +828,27 @@ triton_parse_result_t triton_parse_json(triton_json_t* json, const char* string)
 
 // Stringify
 void triton_stringify_value(FILE* stream, triton_value_t* value) {
-    if(value->type == TRITON_PRIMITIVE_VALUE) {
-        fprintf(stream, "%s", value->as.primitive.lexeme);
+    if(value->type == TRITON_STRING_VALUE) {
+        fprintf(stream, "\"%s\"", value->as.string);
+        return;
+    }
+
+    if(value->type == TRITON_NUMBER_VALUE) {
+        fprintf(stream, "%f", value->as.number);
+        return;
+    }
+
+    if(value->type == TRITON_BOOLEAN_VALUE) {
+        if(value->as.boolean)
+            fprintf(stream, "true");
+        else 
+            fprintf(stream, "false");
+        
+        return;
+    }
+
+    if(value->type == TRITON_NULL_VALUE) {
+        fprintf(stream, "null");
         return;
     }
 
