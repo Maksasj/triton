@@ -545,7 +545,7 @@ int lexer_string_comments() {
 
 int lexer_string_double_escape_a() {
     triton_lexer_t lexer = (triton_lexer_t) {
-        .input = "\"\\a\"",
+        .input = "\"\\\\a\"",
         .pointer = 0
     };
 
@@ -1931,7 +1931,8 @@ int lex_reject_number_invalid_minus_negative_minus_real() {
 
 int lex_reject_string_unescaped_newline() {
     triton_lexer_t lexer = (triton_lexer_t) {
-        .input = "\"new\nline\"",
+        .input = "\"new"
+            "line\"",
         .pointer = 0
     };
 
@@ -1945,7 +1946,7 @@ int lex_reject_string_unescaped_newline() {
 
 int lex_reject_string_backslash_00() {
     triton_lexer_t lexer = (triton_lexer_t) {
-        .input = "\"\\\"",
+        .input = "\"\\\0\"",
         .pointer = 0
     };
 
@@ -1999,9 +2000,9 @@ int lex_reject_string_invalid_unicode_escape() {
     return OK; 
 }
 
-int lex_reject_string_single_doublequote() {
+int lex_reject_string_single_double_quote() {
     triton_lexer_t lexer = (triton_lexer_t) {
-        .input = "\"",
+        .input = "\\\"",
         .pointer = 0
     };
 
@@ -2113,7 +2114,7 @@ int lex_reject_string_single_string_no_double_quotes() {
 
 int lex_reject_string_unescaped_ctrl_char() {
     triton_lexer_t lexer = (triton_lexer_t) {
-        .input = "\"aa\"",
+        .input = "\"a\0a\"",
         .pointer = 0
     };
 
@@ -2209,9 +2210,37 @@ int lex_reject_string_invalid_backslash_esc() {
     return OK; 
 }
 
+int lex_reject_string_unescaped_double_quate() {
+    triton_lexer_t lexer = (triton_lexer_t) {
+        .input = "\"blablabla\\\"",
+        .pointer = 0
+    };
+
+    triton_token_t token;
+    triton_lex_result_t result = triton_lex_string(&token, &lexer);
+
+    ENSURE_EQ(result.code, TRITON_ERROR);
+
+    return OK; 
+}
+
+int lex_reject_string_unescaped_double_quate_with_garbage() {
+    triton_lexer_t lexer = (triton_lexer_t) {
+        .input = "\"blablabla\\\"asfafasfasf",
+        .pointer = 0
+    };
+
+    triton_token_t token;
+    triton_lex_result_t result = triton_lex_string(&token, &lexer);
+
+    ENSURE_EQ(result.code, TRITON_ERROR);
+
+    return OK; 
+}
+
 int lex_reject_string_1_surrogate_then_escape() {
     triton_lexer_t lexer = (triton_lexer_t) {
-        .input = "\"\\uD800\\\"",
+        .input = "\"\\uD800\\\"1",
         .pointer = 0
     };
 
@@ -2517,7 +2546,7 @@ int lex_string_literals_rejected_group() {
     RUN_TEST(lex_reject_string_incomplete_surrogate_escape_invalid);
     RUN_TEST(lex_reject_string_1_surrogate_then_escape_u1);
     RUN_TEST(lex_reject_string_invalid_unicode_escape);
-    RUN_TEST(lex_reject_string_single_doublequote);
+    RUN_TEST(lex_reject_string_single_double_quote);
     RUN_TEST(lex_reject_string_invalid_utf_8_in_escape);
     RUN_TEST(lex_reject_string_1_surrogate_then_escape_u);
     RUN_TEST(lex_reject_string_accentuated_char_no_quotes);
@@ -2532,6 +2561,8 @@ int lex_string_literals_rejected_group() {
     RUN_TEST(lex_reject_string_incomplete_escape);
     RUN_TEST(lex_reject_string_escaped_emoji);
     RUN_TEST(lex_reject_string_invalid_backslash_esc);
+    RUN_TEST(lex_reject_string_unescaped_double_quate);
+    RUN_TEST(lex_reject_string_unescaped_double_quate_with_garbage);
     RUN_TEST(lex_reject_string_1_surrogate_then_escape);
     RUN_TEST(lex_reject_string_escaped_ctrl_char_tab);
     RUN_TEST(lex_reject_string_escape_x);

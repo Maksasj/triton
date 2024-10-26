@@ -389,34 +389,39 @@ triton_lex_result_t triton_lex_string(triton_token_t* token, triton_lexer_t* lex
         return (triton_lex_result_t) { TRITON_ERROR };
 
     int start = lexer->pointer;
-    ++lexer->pointer;
 
     while(1) {
+        ++lexer->pointer;
         char symbol = lexer->input[lexer->pointer];
 
         if(symbol == '"')
             break;
 
-        if(symbol == '\\') {
-            symbol = lexer->input[++lexer->pointer];
+        // Not sure about this one
+        if(symbol == '\0')
+            return (triton_lex_result_t) { TRITON_ERROR };
 
-            if(symbol == '"')
-                ++lexer->pointer;
-            else if(symbol == '\\')
-                ++lexer->pointer;
-            else if(symbol == '/')
-                ++lexer->pointer;
-            else if(symbol == 'b')
-                ++lexer->pointer;
-            else if(symbol == 'f')
-                ++lexer->pointer;
-            else if(symbol == 'n')
-                ++lexer->pointer;
-            else if(symbol == 'r')
-                ++lexer->pointer;
-            else if(symbol == 't')
-                ++lexer->pointer;
-            else if(symbol == 'u') {
+        if(symbol == '\\') {
+            ++lexer->pointer;
+            symbol = lexer->input[lexer->pointer];
+
+            if(symbol == '"') {
+                continue;
+            } else if(symbol == '\\') {
+                continue;
+            } else if(symbol == '/') {
+                continue;
+            } else if(symbol == 'b') {
+                continue;
+            } else if(symbol == 'f') {
+                continue;
+            } else if(symbol == 'n') {
+                continue;
+            } else if(symbol == 'r') {
+                continue;
+            } else if(symbol == 't') {
+                continue;
+            } else if(symbol == 'u') {
                 ++lexer->pointer;
 
                 for(int i = 0; i < 4; ++i) {
@@ -427,12 +432,14 @@ triton_lex_result_t triton_lex_string(triton_token_t* token, triton_lexer_t* lex
                     
                     ++lexer->pointer;
                 }
+
+                --lexer->pointer;
+
+                continue;
             } else {
                 return (triton_lex_result_t) { TRITON_ERROR };
             }
-        } 
-
-        ++lexer->pointer;
+        }
     }
 
    ++lexer->pointer;
