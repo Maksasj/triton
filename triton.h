@@ -657,7 +657,7 @@ triton_parse_result_t triton_parse_object(triton_value_t* value, triton_lexer_t*
         return (triton_parse_result_t) { TRITON_ERROR };
 
     triton_object_t object;
-    create_triton_array(&object, 10);
+    create_triton_object(&object, 10);
 
     int i = 0;
     for(;;++i) {
@@ -682,11 +682,11 @@ triton_parse_result_t triton_parse_object(triton_value_t* value, triton_lexer_t*
         triton_value_entry_t* actual = (triton_value_entry_t*) malloc(sizeof(triton_value_entry_t));
         actual->name = key_value.as.string;
         actual->value = entry_value;
-        triton_array_push(&object, actual);
+        triton_object_push(&object, actual);
     }
 
     if(triton_parse_token(lexer, TRITON_TOKEN_RBRACE).code == TRITON_ERROR) {
-        free_triton_array(&object); // Todo
+        free_triton_object(&object); // Todo
         return (triton_parse_result_t) { TRITON_ERROR };
     }
 
