@@ -268,6 +268,17 @@ triton_value_entry_t* triton_object_get(triton_object_t* triton_object, int inde
     return container_base_get(triton_object, index);
 }
 
+triton_value_entry_t* triton_object_get_field(triton_object_t* triton_object, const char* field) {
+    for(int i = 0; i < container_base_size(triton_object); ++i) {
+        triton_value_entry_t* entry = container_base_get(triton_object, i);
+
+        if(strcmp(entry->name, field) == 0)
+            return entry;
+    }
+
+    return NULL;
+}
+
 int triton_object_empty(triton_object_t* triton_object) {
     return container_base_empty(triton_object);
 }
